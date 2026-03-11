@@ -4,3 +4,16 @@ main
 .idea
 vendor
 .DS_Store
+docker-volume/
+
+# authentik
+authentik/data/
+
+# jellyfin runtime
+jellyfin/cache/
+jellyfin/config/
+jellyfin/media/
+
+# peertube runtime
+peertube/data/
+peertube/opendkim/

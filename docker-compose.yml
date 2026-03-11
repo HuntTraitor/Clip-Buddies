@@ -1,30 +1,112 @@
 services:
-  backend:
+  authentik-postgresql:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${AUTHENTIK_PG_USER}
+      POSTGRES_PASSWORD: ${AUTHENTIK_PG_PASS}
+      POSTGRES_DB: ${AUTHENTIK_PG_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - authentik_db:/var/lib/postgresql/data
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.2.1}
+    command: server
+    restart: unless-stopped
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_PG_USER}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
+      AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_PG_DB}
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - ./authentik/data:/data
+      - ./authentik/custom-templates:/templates
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.2.1}
+    command: worker
+    restart: unless-stopped
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_PG_USER}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
+      AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_PG_DB}
+    user: root
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./authentik/data:/data
+      - ./authentik/certs:/certs
+      - ./authentik/custom-templates:/templates
+
+  peertube-postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PEERTUBE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${PEERTUBE_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${PEERTUBE_POSTGRES_DB}
+    volumes:
+      - peertube_db:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    volumes:
+      - peertube_redis:/data
+
+  postfix:
+    image: mwader/postfix-relay
+    restart: unless-stopped
     env_file:
       - .env
-    tty: true
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    working_dir: /backend
-    ports:
-      - '3000:3000'
-    entrypoint: [ "CompileDaemon", "--build=make build", "--command=./bin/api" ]
-    restart: on-failure
     volumes:
-      - ./backend:/backend
-    depends_on:
-      - db
+      - ./peertube/opendkim/keys:/etc/opendkim/keys
 
-  db:
-    image: postgres:latest
-    container_name: database
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+  peertube:
+    image: chocobozzz/peertube:production-bookworm
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - peertube-postgres
+      - redis
+      - postfix
     ports:
-      - '5432:5432'
+      - "9001:9000"
+      - "1935:1935"
     volumes:
-      - ./backend/db/sql/databases.sql:/docker-entrypoint-initdb.d/1.databases.sql
-      - ./backend/db/sql/seeds.sql:/tmp/seeds.sql
+      - peertube_assets:/app/client/dist
+      - ./peertube/data:/data
+      - ./peertube/config:/config
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    restart: unless-stopped
+    ports:
+      - "8096:8096"
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache
+      - ./jellyfin/media:/media:ro
+
+volumes:
+  authentik_db:
+  peertube_db:
+  peertube_redis:
+  peertube_assets:
