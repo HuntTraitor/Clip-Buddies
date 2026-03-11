@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"context"
@@ -12,16 +12,16 @@ import (
 	"time"
 )
 
-func (app *application) serve() error {
-	router := app.routes()
+func (app *Application) Serve() error {
+	router := app.Routes()
 
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", app.config.port),
+		Addr:         fmt.Sprintf(":%d", app.Config.Port),
 		Handler:      router,
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
-		ErrorLog:     slog.NewLogLogger(app.logger.Handler(), slog.LevelError),
+		ErrorLog:     slog.NewLogLogger(app.Logger.Handler(), slog.LevelError),
 	}
 
 	shutdownError := make(chan error, 1)
@@ -31,7 +31,7 @@ func (app *application) serve() error {
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 		s := <-quit
-		app.logger.Info("caught signal", "signal", s.String())
+		app.Logger.Info("caught signal", "signal", s.String())
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -41,13 +41,13 @@ func (app *application) serve() error {
 			return
 		}
 
-		app.logger.Info("completing background tasks", "addr", srv.Addr)
-		app.wg.Wait()
+		app.Logger.Info("completing background tasks", "addr", srv.Addr)
+		app.WG.Wait()
 
 		shutdownError <- nil
 	}()
 
-	app.logger.Info("starting server", "addr", srv.Addr, "env", app.config.env)
+	app.Logger.Info("starting server", "addr", srv.Addr, "env", app.Config.Env)
 
 	err := srv.ListenAndServe()
 	if !errors.Is(err, http.ErrServerClosed) {
@@ -58,6 +58,6 @@ func (app *application) serve() error {
 		return err
 	}
 
-	app.logger.Info("stopped server", "addr", srv.Addr)
+	app.Logger.Info("stopped server", "addr", srv.Addr)
 	return nil
 }

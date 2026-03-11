@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func (app *application) recoverPanic(c *gin.Context) {
+func (app *Application) recoverPanic(c *gin.Context) {
 	defer func() {
 		if err := recover(); err != nil {
 			c.Header("Connection", "close")
@@ -24,7 +24,7 @@ func (app *application) recoverPanic(c *gin.Context) {
 	c.Next()
 }
 
-func (app *application) logRequest(c *gin.Context) {
+func (app *Application) logRequest(c *gin.Context) {
 	start := time.Now()
 
 	var requestBody string
@@ -44,7 +44,7 @@ func (app *application) logRequest(c *gin.Context) {
 
 	c.Next()
 
-	app.logger.Info("http request",
+	app.Logger.Info("http request",
 		"ip", c.ClientIP(),
 		"method", c.Request.Method,
 		"path", c.Request.URL.Path,
@@ -55,7 +55,7 @@ func (app *application) logRequest(c *gin.Context) {
 	)
 }
 
-func (app *application) rateLimit() gin.HandlerFunc {
+func (app *Application) rateLimit() gin.HandlerFunc {
 	type client struct {
 		limiter  *rate.Limiter
 		lastSeen time.Time
@@ -69,9 +69,10 @@ func (app *application) rateLimit() gin.HandlerFunc {
 	go func() {
 		for {
 			time.Sleep(time.Minute)
+
 			mu.Lock()
 			for ip, client := range clients {
-				if time.Since(client.lastSeen) > app.config.limiter.expiration {
+				if time.Since(client.lastSeen) > app.Config.Limiter.Expiration {
 					delete(clients, ip)
 				}
 			}
@@ -80,21 +81,20 @@ func (app *application) rateLimit() gin.HandlerFunc {
 	}()
 
 	return func(c *gin.Context) {
-		if app.config.limiter.enabled {
+		if app.Config.Limiter.Enabled {
 			ip := realip.FromRequest(c.Request)
 
 			mu.Lock()
 			if _, found := clients[ip]; !found {
 				clients[ip] = &client{
 					limiter: rate.NewLimiter(
-						rate.Limit(app.config.limiter.rps),
-						app.config.limiter.burst,
+						rate.Limit(app.Config.Limiter.RPS),
+						app.Config.Limiter.Burst,
 					),
 				}
 			}
 
 			clients[ip].lastSeen = time.Now()
-
 			allowed := clients[ip].limiter.Allow()
 			mu.Unlock()
 

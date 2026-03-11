@@ -1,4 +1,4 @@
--include .env
+-include ../.env
 
 # ==================================================================================== #
 # HELPERS
@@ -34,17 +34,17 @@ seed:
 ## db-stats: checks the status of the database to see if you are connected
 .PHONY: db-status
 db-status:
-	@docker compose exec -T app goose -dir=db/migrations postgres "$(MIGRATION_URL)" status
+	@docker compose exec -T backend goose -dir=db/migrations postgres "$(MIGRATION_URL)" status
 
 ## up: runs the up migrations
 .PHONY: up
 up:
-	@docker compose exec -T app goose -dir=db/migrations postgres "$(MIGRATION_URL)" up
+	@docker compose exec -T backend goose -dir=db/migrations postgres "$(MIGRATION_URL)" up
 
 ## reset: resets the migrations
 .PHONY: reset
 reset:
-	@docker compose exec -T app goose -dir=db/migrations postgres "$(MIGRATION_URL)" reset
+	@docker compose exec -T backend goose -dir=db/migrations postgres "$(MIGRATION_URL)" reset
 
 # ==================================================================================== #
 # QUALITY CONTROL
