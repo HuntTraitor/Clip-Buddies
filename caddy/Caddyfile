@@ -1,0 +1,31 @@
+auth.localhost {
+	tls /etc/caddy/certs/localhost.pem /etc/caddy/certs/localhost-key.pem
+
+	reverse_proxy authentik-server:9000 {
+		header_up Host {host}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Port 443
+	}
+}
+
+peertube.localhost {
+	tls /etc/caddy/certs/localhost.pem /etc/caddy/certs/localhost-key.pem
+
+	reverse_proxy peertube:9000 {
+		header_up Host {host}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Port 443
+	}
+}
+
+jellyfin.localhost {
+	tls /etc/caddy/certs/localhost.pem /etc/caddy/certs/localhost-key.pem
+	reverse_proxy jellyfin:8096 {
+		header_up Host {host}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Port 443
+	}
+}

@@ -27,9 +27,6 @@ services:
       AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_PG_USER}
       AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
       AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_PG_DB}
-    ports:
-      - "9000:9000"
-      - "9443:9443"
     volumes:
       - ./authentik/data:/data
       - ./authentik/custom-templates:/templates
@@ -58,9 +55,9 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${PEERTUBE_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${PEERTUBE_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${PEERTUBE_POSTGRES_DB}
+      POSTGRES_USER: ${PEERTUBE_DB_USERNAME}
+      POSTGRES_PASSWORD: ${PEERTUBE_DB_PASSWORD}
+      POSTGRES_DB: ${PEERTUBE_DB}
     volumes:
       - peertube_db:/var/lib/postgresql/data
 
@@ -83,30 +80,52 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      NODE_EXTRA_CA_CERTS: /certs/rootCA.pem
     depends_on:
       - peertube-postgres
       - redis
       - postfix
     ports:
-      - "9001:9000"
       - "1935:1935"
     volumes:
       - peertube_assets:/app/client/dist
       - ./peertube/data:/data
       - ./peertube/config:/config
+      - /home/hunter/.local/share/mkcert/rootCA.pem:/certs/rootCA.pem:ro
+    extra_hosts:
+      - "auth.localhost:host-gateway"
+      - "peertube.localhost:host-gateway"
+      - "jellyfin.localhost:host-gateway"
 
   jellyfin:
     image: jellyfin/jellyfin:latest
     restart: unless-stopped
-    ports:
-      - "8096:8096"
     volumes:
       - ./jellyfin/config:/config
       - ./jellyfin/cache:/cache
       - ./jellyfin/media:/media:ro
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/certs:/etc/caddy/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - authentik-server
+      - peertube
+      - jellyfin
 
 volumes:
   authentik_db:
   peertube_db:
   peertube_redis:
   peertube_assets:
+  caddy_data:
+  caddy_config:
