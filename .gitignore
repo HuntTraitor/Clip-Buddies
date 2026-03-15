@@ -18,5 +18,5 @@ jellyfin/media/
 peertube/data/
 peertube/opendkim/
 
-root.crt
+root*
 caddy/certs/

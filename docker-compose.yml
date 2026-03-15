@@ -99,12 +99,18 @@ services:
       - "jellyfin.localhost:host-gateway"
 
   jellyfin:
-    image: jellyfin/jellyfin:latest
+    build:
+      context: .
+      dockerfile: ./jellyfin/Dockerfile
     restart: unless-stopped
     volumes:
       - ./jellyfin/config:/config
       - ./jellyfin/cache:/cache
       - ./jellyfin/media:/media:ro
+    extra_hosts:
+      - "auth.localhost:host-gateway"
+      - "peertube.localhost:host-gateway"
+      - "jellyfin.localhost:host-gateway"
 
   caddy:
     image: caddy:2
